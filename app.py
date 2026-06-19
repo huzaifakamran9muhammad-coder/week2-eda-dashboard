@@ -1,83 +1,126 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+import seaborn as sns
 
 # Page settings
 st.set_page_config(page_title="EDA Dashboard", layout="wide")
 
 st.title("📊 Exploratory Data Analysis Dashboard")
 
-# Load dataset
-df = pd.read_csv("dataset.csv")
+# Load dataset (safe loading)
+@st.cache_data
+def load_data():
+    return pd.read_csv("dataset.csv")
 
-# Dataset Overview
+df = load_data()
+
+# ---------------------------
+# DATA CLEANING (REAL)
+# ---------------------------
+df = df.drop_duplicates()
+
+# Fill missing values (numeric only)
+df.fillna(df.select_dtypes(include="number").mean(), inplace=True)
+
+# ---------------------------
+# DATASET OVERVIEW
+# ---------------------------
 st.header("Dataset Overview")
-st.write("Shape of Dataset:", df.shape)
-st.write(df.head())
+st.write("Shape:", df.shape)
+st.dataframe(df.head())
 st.write(df.dtypes)
 
-# Data Cleaning
+# ---------------------------
+# DATA CLEANING REPORT
+# ---------------------------
 st.header("Data Cleaning")
 
 st.subheader("Missing Values")
 st.write(df.isnull().sum())
 
-st.subheader("Duplicate Records")
+st.subheader("Duplicate Records (after cleaning)")
 st.write(df.duplicated().sum())
 
-# Statistical Summary
+# ---------------------------
+# STATISTICS
+# ---------------------------
 st.header("Statistical Summary")
 st.write(df.describe())
 
-# Select numeric column
+# ---------------------------
+# SIDEBAR FILTERS (IMPORTANT)
+# ---------------------------
+st.sidebar.header("Filters")
+
 numeric_cols = df.select_dtypes(include="number").columns
 
-selected = st.sidebar.selectbox(
-    "Select Numeric Column",
-    numeric_cols
+selected_col = st.sidebar.selectbox("Select Numeric Column", numeric_cols)
+
+min_val, max_val = float(df[selected_col].min()), float(df[selected_col].max())
+
+range_val = st.sidebar.slider(
+    "Filter Range",
+    min_val,
+    max_val,
+    (min_val, max_val)
 )
 
-# Histogram
+df = df[(df[selected_col] >= range_val[0]) & (df[selected_col] <= range_val[1])]
+
+# ---------------------------
+# HISTOGRAM
+# ---------------------------
 st.header("Histogram")
 
 fig, ax = plt.subplots()
-ax.hist(df[selected], bins=20)
-ax.set_xlabel(selected)
+ax.hist(df[selected_col], bins=20)
+ax.set_xlabel(selected_col)
 st.pyplot(fig)
 
-# Box Plot
+# ---------------------------
+# BOX PLOT
+# ---------------------------
 st.header("Box Plot")
 
 fig2, ax2 = plt.subplots()
-ax2.boxplot(df[selected])
+ax2.boxplot(df[selected_col])
 st.pyplot(fig2)
 
-# Correlation Matrix
-st.header("Correlation Matrix")
-st.write(df.corr(numeric_only=True))
+# ---------------------------
+# CORRELATION HEATMAP (IMPORTANT)
+# ---------------------------
+st.header("Correlation Heatmap")
 
-# Scatter Plot
+fig3, ax3 = plt.subplots(figsize=(8, 5))
+sns.heatmap(df.corr(numeric_only=True), annot=True, cmap="coolwarm", ax=ax3)
+st.pyplot(fig3)
+
+# ---------------------------
+# SCATTER PLOT
+# ---------------------------
 st.header("Scatter Plot")
 
 x = st.selectbox("X-axis", numeric_cols)
-y = st.selectbox("Y-axis", numeric_cols, index=1)
+y = st.selectbox("Y-axis", numeric_cols)
 
-fig3, ax3 = plt.subplots()
-ax3.scatter(df[x], df[y])
-ax3.set_xlabel(x)
-ax3.set_ylabel(y)
+fig4, ax4 = plt.subplots()
+ax4.scatter(df[x], df[y])
+ax4.set_xlabel(x)
+ax4.set_ylabel(y)
+st.pyplot(fig4)
 
-st.pyplot(fig3)
-
-# Insights
+# ---------------------------
+# INSIGHTS
+# ---------------------------
 st.header("Insights")
 
 st.write("""
-- Dataset successfully loaded.
-- Missing values identified.
-- Duplicate records checked.
-- Statistical summary generated.
-- Histogram and Box Plot visualize distributions.
-- Scatter Plot shows relationships between variables.
-- Correlation matrix identifies feature relationships.
+- Dataset loaded successfully.
+- Duplicate records removed.
+- Missing values handled using mean imputation.
+- Interactive filters applied.
+- Distribution visualized using histogram and box plot.
+- Correlation heatmap shows relationships between features.
+- Scatter plot shows variable relationships.
 """)
